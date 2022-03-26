@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "ucd_alphabets",
+    "ucd_generate_alphabets",
+    "ucd_generate_names",
+    "ucd_names",
+    "ucd_parser",
+]
