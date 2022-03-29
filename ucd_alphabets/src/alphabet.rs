@@ -14,3 +14,9 @@ pub enum Alphabet {
     NonAlphabet,
     Whitespace,
 }
+
+impl Default for Alphabet {
+    fn default() -> Self {
+        Self::NonAlphabet
+    }
+}
