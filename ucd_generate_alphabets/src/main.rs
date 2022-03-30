@@ -1,45 +1,23 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::prelude::*;
 use ucd_parser::CharacterInfo;
 
-fn get_alphabet_for_name(codepoint: u32, name: String) -> String {
+const ALPHABETS_JSON: &'static str = include_str!("alphabets.json");
+
+fn get_alphabets() -> Vec<String> {
+    serde_json::from_str(ALPHABETS_JSON).unwrap()
+}
+
+fn get_alphabet_for_name(alphabets: &Vec<String>, codepoint: u32, name: String) -> String {
     if is_white_space(codepoint) {
         return "Alphabet::Whitespace".to_owned()
     }
     let name = name.to_uppercase();
-    if name.contains("ARABIC") {
-        return "Alphabet::Arabic".to_owned();
-    }
-    if name.contains("CJK") {
-        return "Alphabet::CJK".to_owned();
-    }
-    if name.contains("CYRILLIC") {
-        return "Alphabet::Cyrillic".to_owned();
-    }
-    if name.contains("GREEK") {
-        return "Alphabet::Greek".to_owned();
-    }
-    if name.contains("HANGUL") {
-        return "Alphabet::Hangul".to_owned();
-    }
-    if name.contains("HEBREW") {
-        return "Alphabet::Hebrew".to_owned();
-    }
-    if name.contains("HIRAGANA") {
-        return "Alphabet::Hiragana".to_owned();
-    }
-    if name.contains("KATAKANA") {
-        return "Alphabet::Katakana".to_owned();
-    }
-    if name.contains("LATIN") {
-        return "Alphabet::Latin".to_owned();
-    }
-    if name.contains("THAI") {
-        return "Alphabet::Thai".to_owned();
-    }
-    if name.contains("TURKIC") {
-        return "Alphabet::Turkic".to_owned();
+    for alphabet in alphabets {
+        if name.contains(&alphabet.to_uppercase()) {
+            return format!("Alphabet::{}", alphabet);
+        }
     }
     "Alphabet::NonAlphabet".to_owned()
 }
@@ -72,7 +50,92 @@ fn is_white_space(codepoint: u32) -> bool {
    || codepoint == 0x3000
 }
 
-fn write_names_map(characters: Vec<CharacterInfo>) {
+fn write_alphabets_enum(alphabets: &Vec<String>) {
+    let mut file = File::create("../ucd_alphabets/src/alphabet.rs").unwrap();
+    file.write_all(b"\
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+
+// DO NOT MODIFY:
+// This file was generated with ucd_generate_alphabets
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Alphabet {
+    NonAlphabet,
+    Whitespace,
+");
+    for alphabet in alphabets {
+        file.write_all(format!("    {},\n", alphabet).as_bytes());
+    }
+    file.write_all(b"}\n");
+    file.write_all(b"
+impl Alphabet {
+    pub fn from_str(value: &str) -> Option<Alphabet> {
+        STR_TO_ENUM.get(value).map(|a| a.to_owned())
+    }
+
+    pub fn to_str(&self) -> &'static str {
+        ENUM_TO_STR.get(self).unwrap()
+    }
+}
+
+impl Default for Alphabet {
+    fn default() -> Self {
+        Self::NonAlphabet
+    }
+}
+
+impl From<String> for Alphabet {
+    fn from(value: String) -> Self {
+        Alphabet::from_str(&value).unwrap()
+    }
+}
+
+impl Into<String> for Alphabet {
+    fn into(self) -> String {
+        self.to_str().to_owned()
+    }
+}
+
+impl Into<String> for &Alphabet {
+    fn into(self) -> String {
+        self.to_str().to_owned()
+    }
+}
+
+lazy_static! {
+    static ref ENUM_TO_STR: HashMap<Alphabet, &'static str> = HashMap::from([
+        (Alphabet::NonAlphabet, \"NonAlphabet\"),
+        (Alphabet::Whitespace, \"Whitespace\"),
+");
+    for alphabet in alphabets {
+        file.write_all(format!(
+            "        (Alphabet::{}, \"{}\"),\n",
+            alphabet,
+            alphabet,
+        ).as_bytes());
+    }
+    file.write_all(b"\
+    ]);
+
+    static ref STR_TO_ENUM: HashMap<&'static str, Alphabet> = HashMap::from([
+        (\"NonAlphabet\", Alphabet::NonAlphabet),
+        (\"Whitespace\", Alphabet::Whitespace),
+");
+    for alphabet in alphabets {
+        file.write_all(format!(
+            "        (\"{}\", Alphabet::{}),\n",
+            alphabet,
+            alphabet,
+        ).as_bytes());
+    }
+    file.write_all(b"\
+    ]);
+}
+    ");
+}
+
+fn write_names_map(alphabets: &Vec<String>, characters: Vec<CharacterInfo>) {
     let mut file = File::create("../ucd_alphabets/src/codepoint_to_alphabet.rs").unwrap();
     file.write_all(b"use crate::Alphabet;\n");
     file.write_all(b"\n");
@@ -85,12 +148,17 @@ fn write_names_map(characters: Vec<CharacterInfo>) {
             }
         }
         last_codepoint = character.codepoint;
-        file.write_all(format!("    {},\n", get_alphabet_for_name(character.codepoint, character.name)).as_bytes());
+        file.write_all(format!(
+            "    {},\n",
+            get_alphabet_for_name(alphabets, character.codepoint, character.name),
+        ).as_bytes());
     }
     file.write_all(b"];\n");
 }
 
 fn main() {
+    let alphabets = get_alphabets();
+    write_alphabets_enum(&alphabets);
     let characters = ucd_parser::read_character_info("../data");
-    write_names_map(characters)
+    write_names_map(&alphabets, characters)
 }
