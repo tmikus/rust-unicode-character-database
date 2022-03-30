@@ -105,27 +105,27 @@ impl Into<String> for &Alphabet {
 
 lazy_static! {
     static ref ENUM_TO_STR: HashMap<Alphabet, &'static str> = HashMap::from([
-        (Alphabet::NonAlphabet, \"NonAlphabet\"),
-        (Alphabet::Whitespace, \"Whitespace\"),
+        (Alphabet::NonAlphabet, \"non-alphabet\"),
+        (Alphabet::Whitespace, \"whitespace\"),
 ");
     for alphabet in alphabets {
         file.write_all(format!(
             "        (Alphabet::{}, \"{}\"),\n",
             alphabet,
-            alphabet,
+            alphabet.to_lowercase(),
         ).as_bytes());
     }
     file.write_all(b"\
     ]);
 
     static ref STR_TO_ENUM: HashMap<&'static str, Alphabet> = HashMap::from([
-        (\"NonAlphabet\", Alphabet::NonAlphabet),
-        (\"Whitespace\", Alphabet::Whitespace),
+        (\"non-alphabet\", Alphabet::NonAlphabet),
+        (\"whitespace\", Alphabet::Whitespace),
 ");
     for alphabet in alphabets {
         file.write_all(format!(
             "        (\"{}\", Alphabet::{}),\n",
-            alphabet,
+            alphabet.to_lowercase(),
             alphabet,
         ).as_bytes());
     }
